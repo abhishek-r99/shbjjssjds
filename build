@@ -1,0 +1,60 @@
+#!/bin/bash
+cd /tmp/rom
+rm -rf .repo &
+
+. build/envsetup.sh
+
+lunch aosp_r5x-userdebug
+export SELINUX_IGNORE_NEVERALLOWS=true
+export SKIP_API_CHECKS=true
+export SKIP_ABI_CHECKS=true
+export CCACHE_DIR=/tmp/ccache
+export CCACHE_EXEC=$(which ccache)
+export USE_CCACHE=1
+ccache -M 20G
+ccache -o compression=true
+ccache -z
+ccache -c
+
+# Telgram env setup
+export BOT_MSG_URL="https://api.telegram.org/bot$API_BOT/sendMessage"
+export BOT_BUILD_URL="https://api.telegram.org/bot$API_BOT/sendDocument"
+
+tg_post_msg() {
+        curl -s -X POST "$BOT_MSG_URL" -d chat_id="$2" \
+        -d "parse_mode=html" \
+        -d text="$1"
+}
+
+#upload function
+up(){
+	curl --upload-file $1 https://transfer.sh/
+}
+
+make_metalava(){
+	make api-stubs-docs || echo no problem
+	make hiddenapi-lists-docs || echo no problem
+	make system-api-stubs-docs || echo no problem
+	make test-api-stubs-docs || echo no problem
+}
+
+make_rom(){
+	tg_post_msg "<b>Rom building CI Build Triggered for Realme 5x</b>" "$CHATID"
+        mka bacon -j10
+
+	if [ -f out/target/product/r5x/*zip ]; then
+		zip=$(up out/target/product/r5x/*zip)
+		echo " "
+		echo "$zip"
+		tg_post_msg "<b>Build Completed</b>%0A%0A<b>Link : </b> <code>"$zip"</code>" "$CHATID"
+	else
+		tg_post_msg "<b>OMG! Build Failed, check cirrus console and fix error</b>" "$CHATID"
+	fi
+}
+
+make_metalava
+make_rom
+up &
+sleep 85m # Lets give some space for uploading ccache
+kill %1 # better way to kill it!
+ccache -s
