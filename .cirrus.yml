@@ -8,7 +8,7 @@
 task:
     name: Buildbomt
     timeout_in: 120m
-     container:
+    container:
       image: apon77/aosp:latest
       cpu: 10
       memory: 24G
